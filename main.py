@@ -4,7 +4,7 @@ import multiprocessing
 import uvicorn
 import os
 from dotenv import load_dotenv
-from .config.logging import log_config
+from config.logging import log_config
 
 load_dotenv()
 

@@ -18,6 +18,7 @@ from .models import (
     ParseErrorResponse,
     ParsedComponent,
     ServerTimeResponse,
+    UnauthorizedResponse,
 )
 
 from main import ProductionMode, mode, ACCESS_KEYS
@@ -43,7 +44,13 @@ async def auth_middleware(request: Request, call_next):
     if api_key and api_key in ACCESS_KEYS:
         return await call_next(request)
 
-    return JSONResponse(status_code=401, content=None)
+    return JSONResponse(
+        status_code=401,
+        content=UnauthorizedResponse(
+            error="unauthorized",
+            detail="A valid API key is required to access this resource"
+        ).model_dump(),
+    )
 
 
 @app.get("/", response_model=ServerTimeResponse)

@@ -1,5 +1,5 @@
 [project]
-name = "libpostal-server"
+name = "fastpostal"
 version = "1.0.0"
 description = "FastAPI server for parsing addresses with libpostal"
 readme = "README.md"
@@ -12,13 +12,21 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
     "slowapi>=0.1.9",
     "pydantic>=2.10.0",
-
     "python-dotenv>=1.0.0",
+    "postal>=1.1.11",
 ]
 
-[project.scripts]
-libpostal-server = "libpostal_server.main:run"
+[tool.uv]
+exclude-newer = "7 days"
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["F401"]
 
 [build-system]
-requires = ["uv_build>=0.12.3,<0.13.0"]
+requires = ["uv_build >= 0.11.21, <0.12.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "src"
+module-root = ""

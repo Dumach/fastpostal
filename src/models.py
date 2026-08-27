@@ -34,3 +34,8 @@ class HealthErrorResponse(BaseModel):
 
 class ParseErrorResponse(BaseModel):
     error: str
+
+
+class UnauthorizedResponse(BaseModel):
+    error: str
+    detail: str
