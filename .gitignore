@@ -12,3 +12,5 @@ wheels/
 .env
 *.mmdb
 *.log
+
+.vscode/
