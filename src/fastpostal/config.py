@@ -70,7 +70,9 @@ class Settings(BaseSettings):
     @property
     def workers(self) -> int:
         """PROD scales to the CPU core count; other modes use a single worker."""
-        return multiprocessing.cpu_count() if self.environment == Environment.PROD else 1
+        # we used too much memory and for the number of requests a single worker is enough
+        #return multiprocessing.cpu_count() if self.environment == Environment.PROD else 1
+        return 1
 
 
 @lru_cache

@@ -4,7 +4,7 @@ import uvicorn
 from pydantic import ValidationError
 
 from fastpostal.config import Environment, get_settings
-from fastpostal.logging_config import log_config
+from fastpostal.logging_config import build_log_config
 
 
 def serve() -> None:
@@ -20,7 +20,7 @@ def serve() -> None:
         host=settings.host,
         port=settings.port,
         log_level=settings.log_level,
-        log_config=log_config,
+        log_config=build_log_config(settings.log_path, settings.log_level),
         reload=settings.environment == Environment.DEV,
         ssl_certfile=settings.ssl_cert,
         ssl_keyfile=settings.ssl_key,

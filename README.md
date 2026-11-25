@@ -53,9 +53,9 @@ The server fails fast on misconfiguration: starting in `DEBUG`/`PROD` without `A
 uv run serve
 ```
 
-- **DEV**: Auto-reload, single worker, no auth required
-- **DEBUG**: Single worker, auth required, debug log level
-- **PROD**: Workers = CPU core count, auth required
+- **DEV**: Auto-reload, no auth required
+- **DEBUG**: auth required, debug log level
+- **PROD**: auth required
 
 ## API Endpoints
 

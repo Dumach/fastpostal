@@ -6,16 +6,18 @@ import logging
 import time
 from datetime import datetime, timezone
 
+from typing import cast
+
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from . import parse_service
 from .config import Environment, Settings, get_settings
 from .models import (
     HealthErrorResponse,
-    HealthMismatch,
     HealthOkResponse,
     ParseErrorResponse,
     ParsedComponent,
@@ -23,9 +25,15 @@ from .models import (
     UnauthorizedResponse,
 )
 
-logger: logging.Logger = logging.getLogger("uvicorn.default")
+logger: logging.Logger = logging.getLogger(__name__)
 
 NO_AUTH_PATHS = {"/", "/health"}
+
+
+def rate_limit_handler(request: Request, exc: Exception) -> Response:
+    """Adapter so slowapi's private handler matches Starlette's exception-handler signature."""
+    # Registered for RateLimitExceeded only, so this always holds at runtime.
+    return _rate_limit_exceeded_handler(request, cast(RateLimitExceeded, exc))
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -38,7 +46,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="postal")
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):
@@ -80,44 +88,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @limiter.limit("60/minute")
     def health(request: Request):
         """Parse a fixed address to verify libpostal; 503 on label mismatch, 500 on parse error."""
-        from postal.parser import parse_address as _parse_address
-
-        address = "1 Apple Park Way Cupertino, California United States"
-        expected: dict[str, str] = {
-            "house_number": "1",
-            "road": "apple park way",
-            "city": "cupertino",
-            "state": "california",
-            "country": "united states",
-        }
-
         try:
-            parsed = _parse_address(address)
-            actual: dict[str, str] = {label: value for value, label in parsed}
-
-            missing: list[dict[str, str | None]] = []
-            for label, value in expected.items():
-                actual_value = actual.get(label)
-                if actual_value is None or actual_value != value:
-                    missing.append(
-                        {"label": label, "expected": value, "actual": actual_value}
-                    )
-
-            if missing:
-                return JSONResponse(
-                    status_code=503,
-                    content=HealthErrorResponse(
-                        status="unhealthy",
-                        message="Address parsing verification failed",
-                        mismatches=[HealthMismatch(**m) for m in missing],
-                    ).model_dump(),
-                )
+            mismatches = parse_service.health_mismatches()
         except Exception:
             # Log the traceback; don't echo internal error details to clients.
             logger.exception("Health check parse failed")
             return JSONResponse(
                 status_code=500,
                 content=ParseErrorResponse(error="Failed to parse address").model_dump(),
+            )
+
+        if mismatches:
+            return JSONResponse(
+                status_code=503,
+                content=HealthErrorResponse(
+                    status="unhealthy",
+                    message="Address parsing verification failed",
+                    mismatches=mismatches,
+                ).model_dump(),
             )
 
         return HealthOkResponse(status="ok")
@@ -136,11 +124,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         address: str = Query(..., description="Address to parse"),
     ):
         """Parse an address into labeled components using libpostal."""
-        from postal.parser import parse_address as _parse_address
-
         try:
-            parsed = _parse_address(address)
-            return [ParsedComponent(label=label, value=value) for value, label in parsed]
+            return parse_service.parse(address)
         except Exception:
             # Log the traceback; don't echo internal error details to clients.
             logger.exception("Parse failed")
