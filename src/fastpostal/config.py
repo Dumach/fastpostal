@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import multiprocessing
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
@@ -69,9 +68,12 @@ class Settings(BaseSettings):
 
     @property
     def workers(self) -> int:
-        """PROD scales to the CPU core count; other modes use a single worker."""
-        # we used too much memory and for the number of requests a single worker is enough
-        #return multiprocessing.cpu_count() if self.environment == Environment.PROD else 1
+        """
+         PROD scales to the CPU core count; other modes use a single worker.
+         we used too much memory and for the number of requests a single worker is enough
+
+         Formula: return multiprocessing.cpu_count() if self.environment == Environment.PROD else 1
+        """
         return 1
 
 
