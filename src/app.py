@@ -4,7 +4,6 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
