@@ -151,5 +151,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
-# Module-level instance so `uvicorn src.app:app` (main.py, systemd) keeps working.
+# Module-level instance so `uvicorn fastpostal.app:app` (fastpostal.serve, systemd) keeps working.
 app = create_app()

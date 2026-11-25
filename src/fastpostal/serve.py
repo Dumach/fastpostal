@@ -1,15 +1,16 @@
-"""Uvicorn entrypoint: load settings and run src.app."""
+"""Uvicorn entrypoint: load settings and run the app."""
 
 import uvicorn
 
-from config.logging import log_config
-from src.config import Environment, get_settings
+from fastpostal.config import Environment, get_settings
+from fastpostal.logging_config import log_config
 
 
-def main() -> None:
+def serve() -> None:
+    """Load settings and start the uvicorn server."""
     settings = get_settings()
     uvicorn.run(
-        "src.app:app",
+        "fastpostal.app:app",
         host=settings.host,
         port=settings.port,
         log_level=settings.log_level,
@@ -24,4 +25,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    serve()

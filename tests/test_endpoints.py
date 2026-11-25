@@ -4,8 +4,8 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from src.app import create_app
-from src.config import Settings
+from fastpostal.app import create_app
+from fastpostal.config import Settings
 
 
 @pytest.fixture()

@@ -47,7 +47,7 @@ Note: values already set in the environment win over `.env` (dotenv does not ove
 ## Running
 
 ```bash
-uv run python main.py
+uv run serve
 ```
 
 - **DEV**: Auto-reload, single worker, no auth required

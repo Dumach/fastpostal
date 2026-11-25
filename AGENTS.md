@@ -5,14 +5,15 @@ FastAPI microservice that parses postal addresses via libpostal (the `postal` Py
 ## Commands
 
 - `uv sync` — install deps (Python 3.12, pinned in `.python-version`)
-- `uv run python main.py` — run the server (reads `.env`, default port 8080)
+- `uv run serve` — run the server (console script for `fastpostal.serve:serve`; reads `.env`, default port 8080)
 - `uv run pytest` — run tests; single test: `uv run pytest tests/test_endpoints.py::TestParseProd::test_no_auth_returns_401`
 - `uv run ruff check .` — lint (ruff is configured in `pyproject.toml` but not a project dependency; it still resolves via uv). Line length 120, rules E/F only, F401 ignored.
 
 ## How it's wired
 
-- All configuration lives in `src/config.py`: `Settings` (pydantic-settings, reads `.env`) plus a cached `get_settings()`. `main.py` is just the uvicorn launcher.
-- `src/app.py` exposes a `create_app(settings)` app factory (defaults to `get_settings()`); the module-level `app = create_app()` is the bridge that makes `uvicorn src.app:app` work.
+- The app is a proper package: `src/fastpostal/` (`app.py`, `config.py`, `models.py`, `logging_config.py`, `serve.py`). The single run command is the `serve` console script (`fastpostal.serve:serve`), which systemd runs via `uv run serve`.
+- All configuration lives in `fastpostal/config.py`: `Settings` (pydantic-settings, reads `.env`) plus a cached `get_settings()`.
+- `fastpostal/app.py` exposes a `create_app(settings)` app factory (defaults to `get_settings()`); the module-level `app = create_app()` is the bridge that makes `uvicorn fastpostal.app:app` work.
 - `ENVIRONMENT` (default `PROD` when unset) controls behavior:
   - `DEV` — auth bypassed, auto-reload, 1 worker
   - `DEBUG` — auth required, 1 worker, debug log level
@@ -21,7 +22,7 @@ FastAPI microservice that parses postal addresses via libpostal (the `postal` Py
 - Auth for `/parse`: `X-API-KEY` header **or** `token` query param; `ACCESS_KEY` env var holds comma-separated keys. `/` and `/health` are exempt from auth.
 - All endpoints are rate-limited to 60 req/min per IP (slowapi).
 - `LOG_PATH` (default `./logs`) receives `access.log` (rotating, 1 MB × 5).
-- Deployed via systemd: `config/fastpostal.service` runs `uv run main.py`. Note its `WorkingDirectory=/home/alex/fastpostal` does not match this repo's location — verify before deploying or changing it.
+- Deployed via systemd: `config/fastpostal.service` runs `uv run serve`. Note its `WorkingDirectory=/home/alex/fastpostal` does not match this repo's location — verify before deploying or changing it.
 
 ## Tests
 

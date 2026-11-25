@@ -12,9 +12,9 @@ User=alex
 Group=alex
 WorkingDirectory=/home/alex/fastpostal
 
-# Run Gunicorn with Uvicorn workers
+# Run uvicorn workers via the project console script
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
-ExecStart=uv run main.py
+ExecStart=uv run serve
 
 # Graceful reload
 ExecReload=/bin/kill -s HUP $MAINPID
