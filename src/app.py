@@ -10,6 +10,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from .config import Environment, get_settings
 from .models import (
     HealthErrorResponse,
     HealthMismatch,
@@ -19,8 +20,6 @@ from .models import (
     ServerTimeResponse,
     UnauthorizedResponse,
 )
-
-from main import ProductionMode, mode, ACCESS_KEYS
 
 app = FastAPI(title="postal")
 logger: logging.Logger = logging.getLogger("uvicorn.default")
@@ -33,14 +32,16 @@ NO_AUTH_PATHS = {"/", "/health"}
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
+    """Require X-API-KEY header or token param on protected paths; skipped in DEV mode."""
     if request.url.path in NO_AUTH_PATHS:
         return await call_next(request)
 
-    if mode == ProductionMode.DEV:
+    settings = get_settings()
+    if settings.environment == Environment.DEV:
         return await call_next(request)
 
     api_key = request.headers.get("X-API-KEY") or request.query_params.get("token")
-    if api_key and api_key in ACCESS_KEYS:
+    if api_key and api_key in settings.access_keys:
         return await call_next(request)
 
     return JSONResponse(
@@ -55,6 +56,7 @@ async def auth_middleware(request: Request, call_next):
 @app.get("/", response_model=ServerTimeResponse)
 @limiter.limit("60/minute")
 def root(request: Request):
+    """Return the server's current UTC time."""
     now = datetime.now(tz=timezone.utc)
     return ServerTimeResponse(
         server_time=now.strftime("%Y-%m-%d %H:%M:%S"),
@@ -70,6 +72,7 @@ def root(request: Request):
 )
 @limiter.limit("60/minute")
 async def health(request: Request):
+    """Parse a fixed address to verify libpostal; 503 on label mismatch, 500 on parse error."""
     from postal.parser import parse_address as _parse_address
 
     address = "1 Apple Park Way Cupertino, California United States"
@@ -127,6 +130,7 @@ def parse(
     request: Request,
     address: str = Query(..., description="Address to parse"),
 ):
+    """Parse an address into labeled components using libpostal."""
     from postal.parser import parse_address as _parse_address
 
     try:

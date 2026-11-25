@@ -11,7 +11,8 @@ FastAPI microservice that parses postal addresses via libpostal (the `postal` Py
 
 ## How it's wired
 
-- `main.py` (root) parses env vars at import time and launches uvicorn with `src.app:app`; `src/app.py` imports `mode`/`ACCESS_KEYS` back from `main`. Don't restructure these imports without updating the tests.
+- All configuration lives in `src/config.py`: `Settings` (pydantic-settings, reads `.env`) plus a cached `get_settings()`. `main.py` is just the uvicorn launcher; `src/app.py` reads config via `get_settings()` — neither imports the other.
+- `get_settings()` is `lru_cache`d: tests get fresh settings by purging the `src.*` modules after changing env vars.
 - `ENVIRONMENT` (default `PROD` when unset) controls behavior:
   - `DEV` — auth bypassed, auto-reload, 1 worker
   - `DEBUG` — auth required, 1 worker, debug log level
