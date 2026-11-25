@@ -1,38 +1,22 @@
-import os
-import sys
 from unittest.mock import patch
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from _pytest.fixtures import FixtureRequest
 
-
-def _get_app(mode: str = "PROD"):
-    """Import app with specific ENVIRONMENT mode."""
-    # Set environment before importing
-    os.environ["ENVIRONMENT"] = mode
-    os.environ["ACCESS_KEY"] = "test-key-123"
-
-    # Clear cached modules so src.config re-reads the env and get_settings
-    # (lru_cached) starts with an empty cache
-    for mod in list(sys.modules.keys()):
-        if mod.startswith("src."):
-            del sys.modules[mod]
-
-    from src.app import app
-
-    return app
+from src.app import create_app
+from src.config import Settings
 
 
 @pytest.fixture()
 def client_prod() -> TestClient:
-    return TestClient(_get_app("PROD"))
+    settings = Settings(environment="PROD", access_key="test-key-123")
+    return TestClient(create_app(settings))
 
 
 @pytest.fixture()
 def client_dev() -> TestClient:
-    return TestClient(_get_app("DEV"))
+    return TestClient(create_app(Settings(environment="DEV")))
 
 
 @pytest.fixture()

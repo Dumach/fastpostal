@@ -11,8 +11,8 @@ FastAPI microservice that parses postal addresses via libpostal (the `postal` Py
 
 ## How it's wired
 
-- All configuration lives in `src/config.py`: `Settings` (pydantic-settings, reads `.env`) plus a cached `get_settings()`. `main.py` is just the uvicorn launcher; `src/app.py` reads config via `get_settings()` — neither imports the other.
-- `get_settings()` is `lru_cache`d: tests get fresh settings by purging the `src.*` modules after changing env vars.
+- All configuration lives in `src/config.py`: `Settings` (pydantic-settings, reads `.env`) plus a cached `get_settings()`. `main.py` is just the uvicorn launcher.
+- `src/app.py` exposes a `create_app(settings)` app factory (defaults to `get_settings()`); the module-level `app = create_app()` is the bridge that makes `uvicorn src.app:app` work.
 - `ENVIRONMENT` (default `PROD` when unset) controls behavior:
   - `DEV` — auth bypassed, auto-reload, 1 worker
   - `DEBUG` — auth required, 1 worker, debug log level
@@ -26,4 +26,4 @@ FastAPI microservice that parses postal addresses via libpostal (the `postal` Py
 ## Tests
 
 - Tests mock `postal.parser.parse_address`; only the live `/health` endpoint exercises real parsing (it parses a fixed Cupertino address and returns 503 on label mismatch, 500 on exception).
-- Mode-dependent tests re-import `src.app` by purging `sys.modules` and setting `ENVIRONMENT`/`ACCESS_KEY` first (`_get_app` in `tests/test_endpoints.py`). Keep that pattern when adding mode-specific tests.
+- Tests build a fresh per-mode app with `create_app(Settings(environment=..., access_key=...))` (fixtures in `tests/test_endpoints.py`) — no env vars, no `sys.modules` purging. Each app instance gets its own slowapi limiter state.
