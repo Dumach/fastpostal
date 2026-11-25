@@ -6,7 +6,7 @@ A FastAPI-based microservice for parsing postal addresses using [libpostal](http
 
 - Address parsing via libpostal
 - API key authentication (production mode)
-- Rate limiting (60 req/min)
+- Rate limiting (60 req/min per IP, per worker process)
 - SSL support
 - Health check endpoint
 - Auto-scaled worker count (CPU core count in production)
@@ -41,8 +41,11 @@ cp sample.env .env
 | `ACCESS_KEY` | - | Comma-separated API keys |
 | `ENVIRONMENT` | `PROD` | `DEV`, `DEBUG`, or `PROD` |
 | `LOG_PATH` | `./logs` | Directory for `access.log` (rotating, 1 MB x 5) |
+| `FORWARDED_ALLOW_IPS` | `127.0.0.1,::1` | Comma-separated trusted proxies allowed to set `X-Forwarded-*` headers |
 
 Note: values already set in the environment win over `.env` (dotenv does not override), and env vars are read once at startup — restart after changing them.
+
+The server fails fast on misconfiguration: starting in `DEBUG`/`PROD` without `ACCESS_KEY`, with only one of `SSL_CERT`/`SSL_KEY`, or with a missing SSL file exits with a clear error before serving.
 
 ## Running
 

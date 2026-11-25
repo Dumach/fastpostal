@@ -1,6 +1,7 @@
 """Uvicorn entrypoint: load settings and run the app."""
 
 import uvicorn
+from pydantic import ValidationError
 
 from fastpostal.config import Environment, get_settings
 from fastpostal.logging_config import log_config
@@ -8,7 +9,12 @@ from fastpostal.logging_config import log_config
 
 def serve() -> None:
     """Load settings and start the uvicorn server."""
-    settings = get_settings()
+    try:
+        settings = get_settings()
+    except ValidationError as exc:
+        # One-line error instead of a pydantic traceback.
+        raise SystemExit(f"Configuration error:\n{exc}") from exc
+
     uvicorn.run(
         "fastpostal.app:app",
         host=settings.host,
@@ -20,7 +26,7 @@ def serve() -> None:
         ssl_keyfile=settings.ssl_key,
         workers=settings.workers,
         proxy_headers=True,  # Trust X-Forwarded headers from reverse proxy
-        forwarded_allow_ips="*",  # Allow forwarded headers from any IP
+        forwarded_allow_ips=settings.forwarded_allow_ips,  # Only trusted proxies
     )
 
 

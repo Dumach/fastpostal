@@ -31,6 +31,9 @@ NO_AUTH_PATHS = {"/", "/health"}
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the FastAPI app for the given settings (process defaults when omitted)."""
     settings = settings or get_settings()
+    # In-memory state: the 60/minute limit applies per worker process, so with
+    # N uvicorn workers the effective cap is 60 * N / min. A strict global
+    # limit would need a shared backend (e.g. Redis).
     limiter = Limiter(key_func=get_remote_address)
 
     app = FastAPI(title="postal")
@@ -75,7 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         responses={503: {"model": HealthErrorResponse}},
     )
     @limiter.limit("60/minute")
-    async def health(request: Request):
+    def health(request: Request):
         """Parse a fixed address to verify libpostal; 503 on label mismatch, 500 on parse error."""
         from postal.parser import parse_address as _parse_address
 
@@ -109,13 +112,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         mismatches=[HealthMismatch(**m) for m in missing],
                     ).model_dump(),
                 )
-        except Exception as exc:
+        except Exception:
+            # Log the traceback; don't echo internal error details to clients.
             logger.exception("Health check parse failed")
             return JSONResponse(
                 status_code=500,
-                content=ParseErrorResponse(
-                    error=f"Failed to parse address: {exc}"
-                ).model_dump(),
+                content=ParseErrorResponse(error="Failed to parse address").model_dump(),
             )
 
         return HealthOkResponse(status="ok")
@@ -139,13 +141,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             parsed = _parse_address(address)
             return [ParsedComponent(label=label, value=value) for value, label in parsed]
-        except Exception as exc:
+        except Exception:
+            # Log the traceback; don't echo internal error details to clients.
             logger.exception("Parse failed")
             return JSONResponse(
                 status_code=500,
-                content=ParseErrorResponse(
-                    error=f"Failed to parse address: {exc}"
-                ).model_dump(),
+                content=ParseErrorResponse(error="Failed to parse address").model_dump(),
             )
 
     return app

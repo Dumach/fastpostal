@@ -1,11 +1,13 @@
 """Application settings loaded from the environment and .env."""
 
+from __future__ import annotations
+
 import multiprocessing
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +29,10 @@ class Settings(BaseSettings):
     ssl_key: str | None = None
     access_key: str = ""
     log_path: Path = Path("./logs")
+    # Trusted proxies allowed to set X-Forwarded-* headers. Keep this list
+    # short: a trusted peer can spoof the client IP, evading the per-IP
+    # rate limit.
+    forwarded_allow_ips: str = "127.0.0.1,::1"
 
     @field_validator("environment", mode="before")
     @classmethod
@@ -37,6 +43,20 @@ class Settings(BaseSettings):
     @classmethod
     def _empty_ssl_to_none(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    @model_validator(mode="after")
+    def _fail_fast(self) -> Settings:
+        """Reject misconfiguration that would only surface later, mid-request."""
+        if self.environment in (Environment.DEBUG, Environment.PROD) and not self.access_keys:
+            raise ValueError(
+                "ACCESS_KEY must be set (comma-separated) when ENVIRONMENT is DEBUG or PROD"
+            )
+        if bool(self.ssl_cert) != bool(self.ssl_key):
+            raise ValueError("SSL_CERT and SSL_KEY must be set together")
+        for name, value in (("SSL_CERT", self.ssl_cert), ("SSL_KEY", self.ssl_key)):
+            if value is not None and not Path(value).is_file():
+                raise ValueError(f"{name} points to a missing file: {value}")
+        return self
 
     @property
     def access_keys(self) -> list[str]:

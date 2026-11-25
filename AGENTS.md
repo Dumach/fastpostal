@@ -20,7 +20,9 @@ FastAPI microservice that parses postal addresses via libpostal (the `postal` Py
   - `PROD` — auth required, `cpu_count()` workers
 - Env vars are read once at import: changes to `ENVIRONMENT`, `ACCESS_KEY`, etc. require a restart. `load_dotenv()` never overrides vars already set, so real env vars win over `.env`.
 - Auth for `/parse`: `X-API-KEY` header **or** `token` query param; `ACCESS_KEY` env var holds comma-separated keys. `/` and `/health` are exempt from auth.
-- All endpoints are rate-limited to 60 req/min per IP (slowapi).
+- Rate limit is 60 req/min per IP, but slowapi state is in-memory **per worker process** — in PROD the effective cap is 60 × workers. A strict global limit needs a shared backend (e.g. Redis).
+- Config fails fast at startup: DEBUG/PROD require `ACCESS_KEY`; `SSL_CERT`/`SSL_KEY` must be set together and exist (validated in `Settings._fail_fast`).
+- `FORWARDED_ALLOW_IPS` defaults to local proxies only (`127.0.0.1,::1`); set it if the reverse proxy is remote. A trusted proxy can rewrite the client IP, which also resets its rate-limit bucket — keep the list short.
 - `LOG_PATH` (default `./logs`) receives `access.log` (rotating, 1 MB × 5).
 - Deployed via systemd: `config/fastpostal.service` runs `uv run serve`. Note its `WorkingDirectory=/home/alex/fastpostal` does not match this repo's location — verify before deploying or changing it.
 
