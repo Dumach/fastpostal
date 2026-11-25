@@ -14,20 +14,17 @@ class ProductionMode(Enum):
     PROD = 3
 
 
-def get_workers(mode: ProductionMode) -> int:
-    """
-    Get count of uvicorn workers.
+def calculate_worker_count(mode: ProductionMode) -> int:
+    """Calculates the worker count to be started in uvicorn
 
-    When PROD it utilizes the max count of cores * 2 + 1.
-    WORKER_COUNT env var can override it.
-    """
-    import multiprocessing
+    Args:
+        mode (ProductionMode): ProductionMode.PROD uses all CPU cores
+                               another modes use only 1 worker
 
-    count: int = 1
-    if mode == ProductionMode.PROD:
-        count = (multiprocessing.cpu_count() * 2) + 1
-    count = int(os.environ.get("WORKER_COUNT", count))
-    return count
+    Returns:
+        int: the number of workers
+    """
+    return multiprocessing.cpu_count() if mode == ProductionMode.PROD else 1
 
 
 env = os.environ.get("ENVIRONMENT", "PROD").strip().lower()
@@ -63,7 +60,7 @@ if __name__ == "__main__":
         reload=mode == ProductionMode.DEV,
         ssl_certfile=SSL_CERT,
         ssl_keyfile=SSL_KEY,
-        workers=get_workers(mode),
+        workers=calculate_worker_count(mode),
         proxy_headers=True,  # Trust X-Forwarded headers from reverse proxy
         forwarded_allow_ips="*",  # Allow forwarded headers from any IP
     )
