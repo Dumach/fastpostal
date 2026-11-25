@@ -9,12 +9,13 @@ A FastAPI-based microservice for parsing postal addresses using [libpostal](http
 - Rate limiting (60 req/min)
 - SSL support
 - Health check endpoint
-- Configurable worker count (auto-scaled in production)
+- Auto-scaled worker count (CPU core count in production)
 
 ## Requirements
 
 - Python 3.12+
-- libpostal system library
+
+(libpostal is bundled with the `postal` package — no system library install needed.)
 
 ## Setup
 
@@ -33,12 +34,15 @@ cp sample.env .env
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Bind address |
+| `HOST` | `127.0.0.1` | Bind address |
 | `PORT` | `8080` | Server port |
 | `SSL_CERT` | - | Path to SSL certificate |
 | `SSL_KEY` | - | Path to SSL private key |
 | `ACCESS_KEY` | - | Comma-separated API keys |
 | `ENVIRONMENT` | `PROD` | `DEV`, `DEBUG`, or `PROD` |
+| `LOG_PATH` | `./logs` | Directory for `access.log` (rotating, 1 MB x 5) |
+
+Note: values already set in the environment win over `.env` (dotenv does not override), and env vars are read once at startup — restart after changing them.
 
 ## Running
 
@@ -47,8 +51,8 @@ uv run python main.py
 ```
 
 - **DEV**: Auto-reload, single worker, no auth required
-- **DEBUG**: Single worker, auth required
-- **PROD**: Auto-scaled workers, auth required
+- **DEBUG**: Single worker, auth required, debug log level
+- **PROD**: Workers = CPU core count, auth required
 
 ## API Endpoints
 
@@ -66,7 +70,7 @@ Returns server time.
 
 ### `GET /health`
 
-Verifies libpostal is working correctly. Returns 503 if parsing fails.
+Verifies libpostal is working correctly by parsing a fixed address. Returns 503 if parsed labels mismatch, 500 if parsing raises.
 
 ### `GET /parse?address={address}`
 
@@ -75,8 +79,9 @@ Parses an address into components.
 **Query Parameters:**
 - `address` (required): Address string to parse
 
-**Headers (production):**
-- `X-API-KEY`: Your API key
+**Auth (production):**
+- `X-API-KEY` header, **or**
+- `token` query parameter (e.g. `/parse?address=...&token=...`)
 
 **Response:**
 
@@ -96,6 +101,7 @@ Parses an address into components.
 |------|-------------|
 | 401 | Invalid or missing API key |
 | 422 | Invalid query parameters |
+| 429 | Rate limit exceeded (60 req/min per IP) |
 | 500 | Server error |
 
 ## License
