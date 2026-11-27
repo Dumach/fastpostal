@@ -32,22 +32,6 @@ def mock_parse() -> Any:
         yield m
 
 
-class TestRoot:
-    def test_returns_200(self, client_prod: TestClient) -> None:
-        response = client_prod.get("/")
-        assert response.status_code == 200
-
-    def test_returns_server_time_fields(self, client_prod: TestClient) -> None:
-        data = client_prod.get("/").json()
-        assert "server_time" in data
-        assert "timestamp" in data
-        assert "timezone" in data
-
-    def test_timezone_is_utc(self, client_prod: TestClient) -> None:
-        data = client_prod.get("/").json()
-        assert data["timezone"] == "UTC"
-
-
 class TestHealth:
     def test_returns_200_when_parse_works(self, client_prod: TestClient, mock_parse: Any) -> None:
         response = client_prod.get("/health")

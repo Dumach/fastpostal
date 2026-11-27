@@ -28,33 +28,31 @@ class Settings(BaseSettings):
     ssl_key: str | None = None
     access_key: str = ""
     log_path: Path = Path("./logs")
-    # Trusted proxies allowed to set X-Forwarded-* headers. Keep this list
-    # short: a trusted peer can spoof the client IP, evading the per-IP
-    # rate limit.
+    # Peers uvicorn trusts for X-Forwarded-For rewriting (FORWARDED_ALLOW_IPS env var).
     forwarded_allow_ips: str = "127.0.0.1,::1"
 
     @field_validator("environment", mode="before")
     @classmethod
     def _normalize_environment(cls, value: object) -> object:
+        """Accept ENVIRONMENT=dev / Dev / DEV alike."""
         return value.upper() if isinstance(value, str) else value
 
     @field_validator("ssl_cert", "ssl_key", mode="before")
     @classmethod
     def _empty_ssl_to_none(cls, value: object) -> object:
+        """Treat empty .env values (e.g. "SSL_CERT =") as unset."""
         return None if isinstance(value, str) and not value.strip() else value
 
     @model_validator(mode="after")
     def _fail_fast(self) -> Settings:
-        """Reject misconfiguration that would only surface later, mid-request."""
+        """Fail fast on misconfiguration instead of 403/HTTPS errors mid-request."""
         if self.environment in (Environment.DEBUG, Environment.PROD) and not self.access_keys:
-            raise ValueError(
-                "ACCESS_KEY must be set (comma-separated) when ENVIRONMENT is DEBUG or PROD"
-            )
+            raise ValueError("ACCESS_KEY must be set (comma-separated) when ENVIRONMENT is DEBUG or PROD")
         if bool(self.ssl_cert) != bool(self.ssl_key):
             raise ValueError("SSL_CERT and SSL_KEY must be set together")
-        for name, value in (("SSL_CERT", self.ssl_cert), ("SSL_KEY", self.ssl_key)):
-            if value is not None and not Path(value).is_file():
-                raise ValueError(f"{name} points to a missing file: {value}")
+        for label, path in (("SSL_CERT", self.ssl_cert), ("SSL_KEY", self.ssl_key)):
+            if path is not None and not Path(path).is_file():
+                raise ValueError(f"{label} points to a missing file: {path}")
         return self
 
     @property
@@ -69,10 +67,10 @@ class Settings(BaseSettings):
     @property
     def workers(self) -> int:
         """
-         PROD scales to the CPU core count; other modes use a single worker.
-         we used too much memory and for the number of requests a single worker is enough
+        PROD scales to the CPU core count; other modes use a single worker.
+        we used too much memory and for the number of requests a single worker is enough
 
-         Formula: return multiprocessing.cpu_count() if self.environment == Environment.PROD else 1
+        Formula: return multiprocessing.cpu_count() if self.environment == Environment.PROD else 1
         """
         return 1
 

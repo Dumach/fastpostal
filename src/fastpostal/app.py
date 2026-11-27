@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import time
-from datetime import datetime, timezone
 
 from typing import cast
 
@@ -19,9 +17,9 @@ from .config import Environment, Settings, get_settings
 from .models import (
     HealthErrorResponse,
     HealthOkResponse,
+    InternalServerErrorResponse,
     ParseErrorResponse,
     ParsedComponent,
-    ServerTimeResponse,
     UnauthorizedResponse,
 )
 
@@ -44,7 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # limit would need a shared backend (e.g. Redis).
     limiter = Limiter(key_func=get_remote_address)
 
-    app = FastAPI(title="postal")
+    app = FastAPI(title="postal", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
@@ -54,30 +52,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if request.url.path in NO_AUTH_PATHS:
             return await call_next(request)
 
-        if settings.environment == Environment.DEV:
-            return await call_next(request)
-
+        is_authenticated = False
         api_key = request.headers.get("X-API-KEY") or request.query_params.get("token")
         if api_key and api_key in settings.access_keys:
+            is_authenticated = True
+        if settings.environment == Environment.DEV:
+            is_authenticated = True
+
+        if is_authenticated:
             return await call_next(request)
+
+        client_host = request.client.host if request.client else "unknown"
+        logger.warning("Invalid API key for %s %s from %s", request.method, request.url.path, client_host)
 
         return JSONResponse(
             status_code=401,
             content=UnauthorizedResponse(
-                error="unauthorized",
-                detail="A valid API key is required to access this resource"
+                error="unauthorized", detail="A valid API key is required to access this resource"
             ).model_dump(),
         )
 
-    @app.get("/", response_model=ServerTimeResponse)
-    @limiter.limit("60/minute")
-    def root(request: Request):
-        """Return the server's current UTC time."""
-        now = datetime.now(tz=timezone.utc)
-        return ServerTimeResponse(
-            server_time=now.strftime("%Y-%m-%d %H:%M:%S"),
-            timestamp=int(time.time()),
-            timezone=str(timezone.utc),
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> Response:
+        # Log the real error server-side; the client only gets a generic body.
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=500,
+            content=InternalServerErrorResponse(
+                detail="Internal server error",
+            ).model_dump(),
         )
 
     @app.get(
@@ -85,7 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response_model=HealthOkResponse,
         responses={503: {"model": HealthErrorResponse}},
     )
-    @limiter.limit("60/minute")
+    @limiter.limit("10/minute")
     def health(request: Request):
         """Parse a fixed address to verify libpostal; 503 on label mismatch, 500 on parse error."""
         try:
@@ -134,6 +137,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 content=ParseErrorResponse(error="Failed to parse address").model_dump(),
             )
 
+    # from app builder
     return app
 
 

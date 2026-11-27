@@ -5,12 +5,6 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class ServerTimeResponse(BaseModel):
-    server_time: str
-    timestamp: int
-    timezone: str
-
-
 class ParsedComponent(BaseModel):
     label: str
     value: str
@@ -38,4 +32,8 @@ class ParseErrorResponse(BaseModel):
 
 class UnauthorizedResponse(BaseModel):
     error: str
+    detail: str
+
+
+class InternalServerErrorResponse(BaseModel):
     detail: str
