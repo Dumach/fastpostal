@@ -23,7 +23,8 @@ A FastAPI-based microservice for parsing postal addresses using [libpostal](http
 # Clone and install
 git clone <repo-url>
 cd fastpostal
-uv sync
+uv sync --frozen --python /usr/bin/python3 --no-python-downloads
+readlink -f .venv/bin/python
 
 # Configure environment
 cp sample.env .env
